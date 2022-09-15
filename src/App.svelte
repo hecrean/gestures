@@ -21,7 +21,6 @@
     return (api as Api)?.state()?.initialised === true;
   };
 
-  let domRect: Rect = { height: 1, width: 1, x: 0, y: 0 };
   let canvasProxyEl: HTMLDivElement;
   let canvasEl: HTMLCanvasElement;
 
@@ -41,14 +40,13 @@
 
     const resize$ = resizeObserver(canvasProxyEl);
     const resize_subscription = resize$.subscribe((_) => {
-      domRect = canvasProxyEl.getBoundingClientRect();
       if (api) fitPlaneToViewport(api.state());
     });
 
-    const handler = (e: Event) => e.preventDefault();
-    document.addEventListener("gesturetart", handler);
-    document.addEventListener("gesturechanged", handler);
-    document.addEventListener("gestureend", handler);
+    // const handler = (e: Event) => e.preventDefault();
+    // document.addEventListener("gesturetart", handler);
+    // document.addEventListener("gesturechanged", handler);
+    // document.addEventListener("gestureend", handler);
 
     //animation loop
     const loop = () => {
@@ -61,9 +59,9 @@
     return () => {
       resize_subscription.unsubscribe();
       cancelAnimationFrame(frameId);
-      document.removeEventListener("gesturetart", handler);
-      document.removeEventListener("gesturechanged", handler);
-      document.removeEventListener("gestureend", handler);
+      // document.removeEventListener("gesturetart", handler);
+      // document.removeEventListener("gesturechanged", handler);
+      // document.removeEventListener("gestureend", handler);
     };
   });
 
@@ -198,8 +196,8 @@
       } else {
         const [x, y] = calculateXYPositionFromNewXY(
           api.state(),
-          ox / domRect.width,
-          oy / domRect.height
+          ox / api.state().renderer.domElement.width,
+          oy / api.state().renderer.domElement.height
         );
         xyPosition.set({ x, y });
       }
@@ -218,14 +216,14 @@
     const pinchConditionPredicate = touches >= 2 && first;
 
     if (isInit(api) && pinchConditionPredicate) {
-      const tx = ox - (domRect.x - domRect.width / 2);
-      const ty = oy - (domRect.y + domRect.height / 2);
+      // const tx = ox - (domRect.x - domRect.width / 2);
+      // const ty = oy - (domRect.y + domRect.height / 2);
 
-      const _x = $xyPosition.x - (ms - 1) * tx;
-      const _y = $xyPosition.y - (ms - 1) * ty;
+      // const _x = $xyPosition.x - (ms - 1) * tx;
+      // const _y = $xyPosition.y - (ms - 1) * ty;
 
-      const [, , z] = calculateXYZPositionFromNewZ(api.state(), os);
-      xyPosition.set({ x: _x, y: _y });
+      const [x, y, z] = calculateXYZPositionFromNewZ(api.state(), os);
+      xyPosition.set({ x: x, y: y });
       scale.set(z);
       zRotation.set((-oa * Math.PI) / 180);
     }
@@ -251,6 +249,29 @@
   tabindex="-1"
 >
   <canvas bind:this={canvasEl} />
+  <div class:overlay={true}>
+    <label>
+      <h3>stiffness ({xyPosition.stiffness})</h3>
+      <input
+        bind:value={xyPosition.stiffness}
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+      />
+    </label>
+
+    <label>
+      <h3>damping ({xyPosition.damping})</h3>
+      <input
+        bind:value={xyPosition.damping}
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+      />
+    </label>
+  </div>
 </div>
 
 <style>
@@ -258,6 +279,11 @@
     width: 100%;
     height: 100%;
     position: relative;
+  }
+  .overlay {
+    position: absolute;
+    right: 1em;
+    z-index: 10;
   }
   canvas {
     background-color: grey;
