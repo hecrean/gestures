@@ -13,6 +13,7 @@
   import { clamp } from "three/src/math/MathUtils";
   import type { Api, ThreeState } from "./three-api";
   import { createThreeApi } from "./three-api";
+  type Rect = { height: number; width: number; x: number; y: number };
 
   let api: Api = createThreeApi();
 
@@ -20,7 +21,6 @@
     return (api as Api)?.state()?.initialised === true;
   };
 
-  type Rect = { height: number; width: number; x: number; y: number };
   let domRect: Rect = { height: 1, width: 1, x: 0, y: 0 };
   let canvasProxyEl: HTMLDivElement;
   let canvasEl: HTMLCanvasElement;
@@ -28,10 +28,6 @@
   let xyPosition = spring({ x: 0, y: 0 });
   let scale = spring(1);
   let zRotation = spring(0);
-
-  $: {
-    console.log($xyPosition, $scale);
-  }
 
   $: if (isInit(api)) {
     api.panTo(api.state(), $xyPosition);
@@ -174,7 +170,7 @@
 
   const wheelConfig: UserWheelConfig = { axis: "y", threshold: 10 };
 
-  function drag_handler(event: CustomEvent<GestureEvent<"drag">>): void {
+  function drag_handler({ detail }: CustomEvent<GestureEvent<"drag">>): void {
     const {
       delta: [dx, dy],
       offset: [ox, oy],
@@ -182,14 +178,20 @@
       touches,
       buttons,
       tap,
-    } = event.detail;
+    } = detail;
+
+    console.log("delta", dx, dy);
+    console.log("offset", ox, ox);
+    console.log("movement", mx, my);
 
     const dragTriggerPredicate = !tap && (touches == 1 || buttons == 1);
 
-    console.log(dx, dy);
-
     if (isInit(api) && dragTriggerPredicate) {
-      const [x, y] = calculateXYPositionFromNewXY(api.state(), dx, dy);
+      const [x, y] = calculateXYPositionFromNewXY(
+        api.state(),
+        dx / domRect.width,
+        dy / domRect.height
+      );
       xyPosition.set({ x, y });
     }
   }
@@ -225,7 +227,7 @@
   class:draggable={true}
   use:drag={dragConfig}
   use:pinch={pinchConfig}
-  on:drag={drag_handler}
+  on:drag|preventDefault={drag_handler}
   on:pinch|preventDefault={pinch_handler}
   tabindex="-1"
 >
