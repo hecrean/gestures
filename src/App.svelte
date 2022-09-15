@@ -102,16 +102,13 @@
 
     const { x, y, z } = camera.position;
 
-    const _dx = dx / domRect.width;
-    const _dy = dy / domRect.height;
-
     const _x = clamp(
-      ((x + _dx) * visibleWidthAtDistance) / 2,
+      ((x + dx) * visibleWidthAtDistance) / 2,
       -width / 2 + visibleWidthAtDistance / 2,
       width / 2 - visibleWidthAtDistance / 2
     );
     const _y = clamp(
-      ((y + _dy) * visibleHeightAtDistance) / 2,
+      ((y + dy) * visibleHeightAtDistance) / 2,
       -height / 2 + visibleHeightAtDistance / 2,
       height / 2 - visibleHeightAtDistance / 2
     );
@@ -180,6 +177,8 @@
   function drag_handler(event: CustomEvent<GestureEvent<"drag">>): void {
     const {
       delta: [dx, dy],
+      offset: [ox, oy],
+      movement: [mx, my],
       touches,
       buttons,
       tap,
@@ -187,8 +186,10 @@
 
     const dragTriggerPredicate = !tap && (touches == 1 || buttons == 1);
 
+    console.log(dx, dy);
+
     if (isInit(api) && dragTriggerPredicate) {
-      const [x, y] = calculateXYPositionFromNewXY(api.state(), -dx, -dy);
+      const [x, y] = calculateXYPositionFromNewXY(api.state(), dx, dy);
       xyPosition.set({ x, y });
     }
   }
