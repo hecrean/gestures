@@ -1,13 +1,21 @@
 // Import stylesheets
 
 import { combineLatest, fromEvent } from "rxjs";
-import { filter, last, map, switchMap, takeUntil, tap } from "rxjs/operators";
+import {
+  filter,
+  last,
+  map,
+  scan,
+  switchMap,
+  takeUntil,
+  tap,
+} from "rxjs/operators";
 
 export type DragMove = {
   pointerId: number;
   currentEvent: PointerEvent;
-  dxFromStart: number;
-  dyFromStart: number;
+  absoluteDelta: { dx: number; dy: number };
+  relativeDelta: { dx: number; dy: number };
 };
 export type DragEnd = {
   pointerId: number;
@@ -77,16 +85,23 @@ export function draggable(element: HTMLElement) {
     switchMap((start) =>
       pointerMove$.pipe(
         filter((move) => move.pointerId === start.pointerId),
-        // scan((accum, item) => {}, [0,0]),
-        map((moveEvent) => {
-          const delta = pointerDifference(element, start, moveEvent);
+        scan<PointerEvent, Array<PointerEvent>>(
+          (stream, latest) => [latest, ...stream],
+          [start]
+        ),
+        map((stream) => {
+          const [latest, penultimate, ...tail] = stream;
+          const absoluteDelta = pointerDifference(element, start, latest);
+          const relativeDelta = pointerDifference(element, latest, penultimate);
+
           return {
-            pointerId: moveEvent.pointerId,
-            currentEvent: moveEvent,
-            dxFromStart: delta.dx,
-            dyFromStart: delta.dy,
+            pointerId: latest.pointerId,
+            currentEvent: latest,
+            absoluteDelta,
+            relativeDelta,
           };
         }),
+
         takeUntil(pointerup$)
       )
     )

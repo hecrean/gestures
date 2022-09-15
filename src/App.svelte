@@ -49,21 +49,21 @@
     );
     const dragend$ = fromEvent<CustomEvent<DragEnd>>(canvasProxyEl, "dragend");
     const dragmove_subscription = dragmove$.subscribe(
-      ({ detail: { currentEvent, dxFromStart, dyFromStart } }) => {
+      ({ detail: { currentEvent, relativeDelta } }) => {
         xyPosition.update(({ x, y }) => ({
-          x: dxFromStart,
-          y: dyFromStart,
+          x: x - relativeDelta.dx,
+          y: y - relativeDelta.dy,
         }));
       }
     );
-    const dragend_subscription = dragend$.subscribe(
-      ({ detail: { currentEvent, dxFromStart, dyFromStart } }) => {
-        xyPosition.update(({ x, y }) => ({
-          x: dxFromStart,
-          y: dyFromStart,
-        }));
-      }
-    );
+    // const dragend_subscription = dragend$.subscribe(
+    //   ({ detail: { currentEvent, dxFromStart, dyFromStart } }) => {
+    //     xyPosition.update(({ x, y }) => ({
+    //       x: dxFromStart,
+    //       y: dyFromStart,
+    //     }));
+    //   }
+    // );
 
     //animation loop
     const loop = () => {
@@ -77,7 +77,6 @@
       resize_subscription.unsubscribe();
       dragmove_subscription.unsubscribe();
       dragSubscription.unsubscribe();
-      dragend_subscription.unsubscribe();
       cancelAnimationFrame(frameId);
     };
   });
