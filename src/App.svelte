@@ -2,8 +2,6 @@
   import { resizeObserver } from "@/utils/resize-observer";
   import { onMount } from "svelte";
   import {
-    drag,
-    pinch,
     type GestureEvent,
     type UserDragConfig,
     type UserPinchConfig,
@@ -14,6 +12,10 @@
   import type { Api, ThreeState } from "./three-api";
   import { createThreeApi } from "./three-api";
   type Rect = { height: number; width: number; x: number; y: number };
+
+  import type { DragEnd, DragMove } from "@/streams/drag";
+  import { draggable } from "@/streams/drag";
+  import { fromEvent } from "rxjs";
 
   let api: Api = createThreeApi();
 
@@ -35,13 +37,39 @@
     api.zoomTo(api.state(), $scale);
   }
 
+  $: {
+    console.log($xyPosition);
+  }
+
   onMount(() => {
     api.init(canvasProxyEl, canvasEl);
+
+    const dragStream$ = draggable(canvasProxyEl);
+    const dragSubscription = dragStream$.subscribe();
 
     const resize$ = resizeObserver(canvasProxyEl);
     const resize_subscription = resize$.subscribe((_) => {
       if (api) fitPlaneToViewport(api.state());
     });
+
+    const dragmove$ = fromEvent<CustomEvent<DragMove>>(
+      canvasProxyEl,
+      "dragmove"
+    );
+    const dragend$ = fromEvent<CustomEvent<DragEnd>>(canvasProxyEl, "dragend");
+    const dragmove_subscription = dragmove$.subscribe(
+      ({ detail: { currentEvent, dxFromStart, dyFromStart } }) => {
+        xyPosition.update(({ x, y }) => ({
+          x: dxFromStart,
+          y: dyFromStart,
+        }));
+      }
+    );
+    const dragend_subscription = dragend$.subscribe(
+      ({ detail: { currentEvent, x, y } }) => {
+        xyPosition.set({ x, y });
+      }
+    );
 
     // const handler = (e: Event) => e.preventDefault();
     // document.addEventListener("gesturetart", handler);
@@ -58,6 +86,8 @@
     //cleanup
     return () => {
       resize_subscription.unsubscribe();
+      dragmove_subscription.unsubscribe();
+      dragSubscription.unsubscribe();
       cancelAnimationFrame(frameId);
       // document.removeEventListener("gesturetart", handler);
       // document.removeEventListener("gesturechanged", handler);
@@ -242,10 +272,6 @@
   bind:this={canvasProxyEl}
   class="canvas-proxy"
   class:draggable={true}
-  use:drag={dragConfig}
-  use:pinch={pinchConfig}
-  on:drag|preventDefault={drag_handler}
-  on:pinch|preventDefault={pinch_handler}
   tabindex="-1"
 >
   <canvas bind:this={canvasEl} />
