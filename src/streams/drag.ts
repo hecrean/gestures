@@ -12,8 +12,8 @@ export type DragMove = {
 export type DragEnd = {
   pointerId: number;
   currentEvent: PointerEvent;
-  x: number;
-  y: number;
+  dxFromStart: number;
+  dyFromStart: number;
 };
 
 export const coordinates = (element: HTMLElement, ev: PointerEvent) => {
@@ -87,7 +87,7 @@ export function draggable(element: HTMLElement) {
             dyFromStart: delta.dy,
           };
         }),
-        takeUntil(pointerRemoved$)
+        takeUntil(pointerup$)
       )
     )
   );
@@ -96,16 +96,15 @@ export function draggable(element: HTMLElement) {
     switchMap((start) =>
       pointerMove$.pipe(
         map((moveEvent) => {
-          const startCoords = coordinates(element, start);
           const delta = pointerDifference(element, start, moveEvent);
           return {
             pointerId: moveEvent.pointerId,
             currentEvent: moveEvent,
-            x: startCoords.ndc.x + delta.dx,
-            y: startCoords.ndc.y + delta.dy,
+            dxFromStart: delta.dx,
+            dyFromStart: delta.dy,
           };
         }),
-        takeUntil(pointerRemoved$),
+        takeUntil(pointerup$),
         last()
       )
     )
@@ -122,14 +121,14 @@ export function draggable(element: HTMLElement) {
     dragMove$.pipe(
       tap((event) => {
         element.dispatchEvent(
-          new CustomEvent<DragPayload>("dragmove", { detail: event })
+          new CustomEvent<DragMove>("dragmove", { detail: event })
         );
       })
     ),
     dragEnd$.pipe(
       tap((event) => {
         element.dispatchEvent(
-          new CustomEvent<DragPayload>("dragend", { detail: event })
+          new CustomEvent<DragEnd>("dragend", { detail: event })
         );
       })
     ),
