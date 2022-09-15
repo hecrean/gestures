@@ -106,7 +106,7 @@
     const _dy = dy / domRect.height;
 
     const _x = clamp(
-      ((x + dx) * visibleWidthAtDistance) / 2,
+      ((x + _dx) * visibleWidthAtDistance) / 2,
       -width / 2 + visibleWidthAtDistance / 2,
       width / 2 - visibleWidthAtDistance / 2
     );
