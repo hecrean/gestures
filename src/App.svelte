@@ -45,6 +45,11 @@
       if (api) fitPlaneToViewport(api.state());
     });
 
+    const handler = (e: Event) => e.preventDefault();
+    document.addEventListener("gesturetart", handler);
+    document.addEventListener("gesturechanged", handler);
+    document.addEventListener("gestureend", handler);
+
     //animation loop
     const loop = () => {
       if (api) api.render(api.state());
@@ -56,6 +61,9 @@
     return () => {
       resize_subscription.unsubscribe();
       cancelAnimationFrame(frameId);
+      document.removeEventListener("gesturetart", handler);
+      document.removeEventListener("gesturechanged", handler);
+      document.removeEventListener("gestureend", handler);
     };
   });
 
@@ -178,37 +186,48 @@
       touches,
       buttons,
       tap,
+      pinching,
+      cancel,
     } = detail;
-
-    console.log("delta", dx, dy);
-    console.log("offset", ox, ox);
-    console.log("movement", mx, my);
 
     const dragTriggerPredicate = !tap && (touches == 1 || buttons == 1);
 
     if (isInit(api) && dragTriggerPredicate) {
-      const [x, y] = calculateXYPositionFromNewXY(
-        api.state(),
-        dx / domRect.width,
-        dy / domRect.height
-      );
-      xyPosition.set({ x, y });
+      if (pinching) {
+        cancel();
+      } else {
+        const [x, y] = calculateXYPositionFromNewXY(
+          api.state(),
+          ox / domRect.width,
+          oy / domRect.height
+        );
+        xyPosition.set({ x, y });
+      }
     }
   }
 
   function pinch_handler({ detail }: CustomEvent<GestureEvent<"pinch">>): void {
     const {
-      offset: [s, a],
+      origin: [ox, oy],
+      first,
+      movement: [ms, ma],
+      offset: [os, oa],
       touches,
     } = detail;
 
-    const pinchConditionPredicate = touches >= 2;
+    const pinchConditionPredicate = touches >= 2 && first;
 
     if (isInit(api) && pinchConditionPredicate) {
-      const [x, y, z] = calculateXYZPositionFromNewZ(api.state(), s);
-      xyPosition.set({ x, y });
+      const tx = ox - (domRect.x - domRect.width / 2);
+      const ty = oy - (domRect.y + domRect.height / 2);
+
+      const _x = $xyPosition.x - (ms - 1) * tx;
+      const _y = $xyPosition.y - (ms - 1) * ty;
+
+      const [, , z] = calculateXYZPositionFromNewZ(api.state(), os);
+      xyPosition.set({ x: _x, y: _y });
       scale.set(z);
-      zRotation.set((-a * Math.PI) / 180);
+      zRotation.set((-oa * Math.PI) / 180);
     }
   }
 
