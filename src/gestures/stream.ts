@@ -196,13 +196,14 @@ export function gesturable(element: HTMLElement) {
     };
   };
 
-  const pointercache$ = merge(pointerdown$, pointerup$).pipe(
+  const pointercache$ = merge(pointerdown$, pointermove$, pointerup$).pipe(
     scan(cache_pointers, new Map<number, TaggedPointedEvent>())
   );
 
   const activepointernumber$ = pointercache$.pipe(
     map((v) => Array.from(v).length),
-    takeWhile((n) => n > 0)
+    takeWhile((n) => n > 0),
+    repeat()
   );
 
   const pinch$: Observable<Pinch> = pointercache$.pipe(
