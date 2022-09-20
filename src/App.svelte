@@ -1,187 +1,87 @@
 <script lang="ts">
-  import type { DragEnd, DragMove } from "@/streams/drag";
-  import { draggable } from "@/streams/drag";
-  import { resizeObserver } from "@/utils/resize-observer";
-  import { fromEvent } from "rxjs";
-  import { onMount } from "svelte";
-  import { spring } from "svelte/motion";
-  import type { Api, ThreeState } from "./three-api";
-  import { createThreeApi } from "./three-api";
-
-  let api: Api = createThreeApi();
-
-  const isInit = (api: Api | undefined | null): api is Api => {
-    return (api as Api)?.state()?.initialised === true;
-  };
-
-  let canvasProxyEl: HTMLDivElement;
-  let canvasEl: HTMLCanvasElement;
-
-  let xyPosition = spring({ x: 0, y: 0 });
-  let scale = spring(1);
-  let zRotation = spring(0);
-
-  $: if (isInit(api)) {
-    api.panTo(api.state(), $xyPosition);
-  }
-  $: if (isInit(api)) {
-    api.zoomTo(api.state(), $scale);
-  }
-
-  $: {
-    console.log($xyPosition);
-  }
-
-  onMount(() => {
-    api.init(canvasProxyEl, canvasEl);
-
-    const dragStream$ = draggable(canvasProxyEl);
-    const dragSubscription = dragStream$.subscribe();
-
-    const resize$ = resizeObserver(canvasProxyEl);
-    const resize_subscription = resize$.subscribe((_) => {
-      if (api) fitPlaneToViewport(api.state());
-    });
-
-    const dragmove$ = fromEvent<CustomEvent<DragMove>>(
-      canvasProxyEl,
-      "dragmove"
-    );
-    const dragend$ = fromEvent<CustomEvent<DragEnd>>(canvasProxyEl, "dragend");
-    const dragmove_subscription = dragmove$.subscribe(
-      ({ detail: { currentEvent, relativeDelta } }) => {
-        xyPosition.update(({ x, y }) => ({
-          x: x - relativeDelta.dx,
-          y: y - relativeDelta.dy,
-        }));
-      }
-    );
-    // const dragend_subscription = dragend$.subscribe(
-    //   ({ detail: { currentEvent, dxFromStart, dyFromStart } }) => {
-    //     xyPosition.update(({ x, y }) => ({
-    //       x: dxFromStart,
-    //       y: dyFromStart,
-    //     }));
-    //   }
-    // );
-
-    //animation loop
-    const loop = () => {
-      if (api) api.render(api.state());
-      requestAnimationFrame(loop);
-    };
-    const frameId = requestAnimationFrame(loop);
-
-    //cleanup
-    return () => {
-      resize_subscription.unsubscribe();
-      dragmove_subscription.unsubscribe();
-      dragSubscription.unsubscribe();
-      cancelAnimationFrame(frameId);
-    };
-  });
-
-  const fitPlaneToViewport = (state: ThreeState) => {
-    const {
-      object3dHandles: { plane },
-      camera,
-    } = state;
-
-    const planeSize = plane.geometry.parameters;
-
-    const vFov = (camera.fov * Math.PI) / 180;
-
-    const cameraZForFittingPlaneHeightInFrame =
-      planeSize.height / (2 * Math.tan(0.5 * vFov));
-    const cameraZForFittingPlaneWidthInFrame =
-      planeSize.width / (2 * camera.aspect * Math.tan(0.5 * vFov));
-
-    const z = Math.min(
-      Math.min(
-        cameraZForFittingPlaneHeightInFrame,
-        cameraZForFittingPlaneWidthInFrame
-      ),
-      camera.position.z
-    );
-
-    xyPosition.set({ x: 0, y: 0 });
-    scale.set(z);
-  };
+  import Canvas from "./Canvas.svelte";
 </script>
 
-<div
-  bind:this={canvasProxyEl}
-  class="canvas-proxy"
-  class:draggable={true}
-  tabindex="-1"
->
-  <canvas bind:this={canvasEl} />
-  <div class:overlay={true}>
-    <label>
-      <h3>stiffness ({xyPosition.stiffness})</h3>
-      <input
-        bind:value={xyPosition.stiffness}
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-      />
-    </label>
+<Canvas />
 
-    <label>
-      <h3>damping ({xyPosition.damping})</h3>
-      <input
-        bind:value={xyPosition.damping}
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-      />
-    </label>
+<div class="video">
+  <video />
+  <button class="play-btn" />
+</div>
+
+<div class="grid">
+  <div class="grid-item">
+    <img class="figure" src="https://dev.random42.com/GSK303/rsv.jpg" />
+    <div class="content">
+      <h1>Hello</h1>
+      <p>It's a thing</p>
+    </div>
+  </div>
+  <div class="grid-item">
+    <img class="figure" src="https://dev.random42.com/GSK303/rsv.jpg" />
+    <div class="content">
+      <h1>Hello</h1>
+      <p>It's a thing</p>
+    </div>
   </div>
 </div>
 
-<style>
-  .canvas-proxy {
-    width: 100%;
-    height: 100%;
+<style lang="scss">
+  .video {
     position: relative;
-  }
-  .overlay {
-    position: absolute;
-    right: 1em;
-    z-index: 10;
-  }
-  canvas {
-    background-color: grey;
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    aspect-ratio: 16/9;
     width: 100%;
-    height: 100%;
   }
-  .draggable {
-    -webkit-touch-callout: none;
-    -ms-touch-action: none;
-    touch-action: none;
-    -moz-user-select: none;
-    -webkit-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    cursor: grab;
-  }
-  .square {
-    position: absolute;
-    height: 80px;
-    width: 80px;
-    border-radius: 8px;
-    background-color: hotpink;
-    font-size: 10px;
+  video {
+    width: 100%;
+    object-fit: contain;
   }
 
-  .square:focus {
-    border: 2px solid red;
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .grid-item {
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px #0000001a;
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+
+    .figure {
+      width: 100%;
+      aspect-ratio: 16/9;
+    }
+    .content {
+      padding: 1rem;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+    }
+  }
+
+  .play-btn {
+    font-family: Arial, Helvetica, sans-serif;
+    background-color: #15717d;
+    border: none;
+    color: #fff;
+    padding: 0.5rem 1rem;
+    border-radius: 3rem;
+    font-weight: 700;
+    cursor: pointer;
+
+    //mobile
+    @media (min-width: 1024px) {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      padding: 1rem 2rem;
+    }
+
+    //desktop
   }
 </style>

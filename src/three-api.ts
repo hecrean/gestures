@@ -1,3 +1,5 @@
+import { getProject, types, type IProjectConfig } from "@theatre/core";
+import { spring } from "svelte/motion";
 import {
   AmbientLight,
   Color,
@@ -11,6 +13,20 @@ import {
   Vector2,
   WebGLRenderer,
 } from "three";
+import projectState from "./state.json";
+
+// studio.initialize();
+
+const state: IProjectConfig = { state: projectState };
+// Create a project for the animation
+// const project = getProject("THREE.js x Theatre.js");
+const project = getProject("THREE.js x Theatre.js", state);
+const sheet = project.sheet("Animated scene");
+
+// Global Variables :
+export let xyPosition = spring({ x: 0, y: 0 });
+export let scale = spring(1);
+export let zRotation = spring(0);
 
 type Object3dHandles = {
   ambientLight: AmbientLight;
@@ -72,6 +88,24 @@ const createThreeApi = () => {
         })
       );
 
+      // Create a Theatre.js object with the props you want to
+      // animate
+      const planeproxy = sheet.object("Plane ", {
+        // Note that the rotation is in radians
+        // (full rotation: 2 * Math.PI)
+        rotation: types.compound({
+          x: types.number(plane.rotation.x, { range: [-2, 2] }),
+          y: types.number(plane.rotation.y, { range: [-2, 2] }),
+          z: types.number(plane.rotation.z, { range: [-2, 2] }),
+        }),
+      });
+
+      planeproxy.onValuesChange((values) => {
+        const { x, y, z } = values.rotation;
+
+        plane.rotation.set(x * Math.PI, y * Math.PI, z * Math.PI);
+      });
+
       camera.position.set(0, 0, 2);
 
       camera.lookAt(plane.position);
@@ -96,7 +130,7 @@ const createThreeApi = () => {
       };
     },
 
-    render: (state: ThreeState) => {
+    render: () => {
       const { renderer, canvasProxyEl, camera, scene, mouse, resolution } =
         state;
 
@@ -110,7 +144,7 @@ const createThreeApi = () => {
         const aspect = canvasProxyEl.clientWidth / canvasProxyEl.clientHeight;
         camera.aspect = aspect;
         renderer.setSize(canvasProxyEl.clientWidth, canvasProxyEl.clientHeight);
-
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         camera.updateProjectionMatrix();
       }
 
@@ -124,9 +158,35 @@ const createThreeApi = () => {
       renderer.setSize(w, h, false);
       camera.updateProjectionMatrix();
     },
-    zoomTo: ({ camera }: ThreeState, z: number) => camera.position.setZ(z),
-    panTo: ({ camera }: ThreeState, { x, y }: { x: number; y: number }) =>
-      camera.position.set(x, y, camera.position.z),
+    zoomTo: (z: number) => state.camera.position.setZ(z),
+    panTo: ({ x, y }: { x: number; y: number }) =>
+      state.camera.position.set(x, y, state.camera.position.z),
+    fitPlaneToViewport: (): void => {
+      const {
+        object3dHandles: { plane },
+        camera,
+      } = state;
+
+      const planeSize = plane.geometry.parameters;
+
+      const vFov = (camera.fov * Math.PI) / 180;
+
+      const cameraZForFittingPlaneHeightInFrame =
+        planeSize.height / (2 * Math.tan(0.5 * vFov));
+      const cameraZForFittingPlaneWidthInFrame =
+        planeSize.width / (2 * camera.aspect * Math.tan(0.5 * vFov));
+
+      const z = Math.min(
+        Math.min(
+          cameraZForFittingPlaneHeightInFrame,
+          cameraZForFittingPlaneWidthInFrame
+        ),
+        camera.position.z
+      );
+
+      xyPosition.set({ x: 0, y: 0 });
+      scale.set(z);
+    },
 
     //https://dev.to/mstn/tap-ts-type-safe-eavesdropping-2jfp
   };

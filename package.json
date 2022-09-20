@@ -23,9 +23,10 @@
   },
   "dependencies": {
     "@juggle/resize-observer": "^3.4.0",
+    "@theatre/core": "^0.5.0",
+    "@theatre/studio": "^0.5.0",
     "@types/three": "^0.144.0",
     "rxjs": "^7.5.6",
-    "svelte-gesture": "^0.1.2",
     "three": "^0.144.0"
   }
 }
