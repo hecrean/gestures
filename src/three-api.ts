@@ -17,15 +17,14 @@ import projectState from "./state.json";
 
 // studio.initialize();
 
-const state: IProjectConfig = { state: projectState };
+// const state: IProjectConfig = { state: projectState };
 // Create a project for the animation
 // const project = getProject("THREE.js x Theatre.js");
-const project = getProject("THREE.js x Theatre.js", state);
-const sheet = project.sheet("Animated scene");
+// const project = getProject("THREE.js x Theatre.js", state);
+// const sheet = project.sheet("Animated scene");
 
 // Global Variables :
-export let xyPosition = spring({ x: 0, y: 0 });
-export let scale = spring(1);
+export let xyzPosition = spring({ x: 0, y: 0, z: 1 });
 export let zRotation = spring(0);
 
 type Object3dHandles = {
@@ -90,21 +89,20 @@ const createThreeApi = () => {
 
       // Create a Theatre.js object with the props you want to
       // animate
-      const planeproxy = sheet.object("Plane ", {
-        // Note that the rotation is in radians
-        // (full rotation: 2 * Math.PI)
-        rotation: types.compound({
-          x: types.number(plane.rotation.x, { range: [-2, 2] }),
-          y: types.number(plane.rotation.y, { range: [-2, 2] }),
-          z: types.number(plane.rotation.z, { range: [-2, 2] }),
-        }),
-      });
+      // const planeproxy = sheet.object("Plane ", {
 
-      planeproxy.onValuesChange((values) => {
-        const { x, y, z } = values.rotation;
+      //   rotation: types.compound({
+      //     x: types.number(plane.rotation.x, { range: [-2, 2] }),
+      //     y: types.number(plane.rotation.y, { range: [-2, 2] }),
+      //     z: types.number(plane.rotation.z, { range: [-2, 2] }),
+      //   }),
+      // });
 
-        plane.rotation.set(x * Math.PI, y * Math.PI, z * Math.PI);
-      });
+      // planeproxy.onValuesChange((values) => {
+      //   const { x, y, z } = values.rotation;
+
+      //   plane.rotation.set(x * Math.PI, y * Math.PI, z * Math.PI);
+      // });
 
       camera.position.set(0, 0, 2);
 
@@ -184,8 +182,7 @@ const createThreeApi = () => {
         camera.position.z
       );
 
-      xyPosition.set({ x: 0, y: 0 });
-      scale.set(z);
+      xyzPosition.set({ x: 0, y: 0, z: z });
     },
 
     //https://dev.to/mstn/tap-ts-type-safe-eavesdropping-2jfp

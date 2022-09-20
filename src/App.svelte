@@ -4,28 +4,6 @@
 
 <Canvas />
 
-<div class="video">
-  <video />
-  <button class="play-btn" />
-</div>
-
-<div class="grid">
-  <div class="grid-item">
-    <img class="figure" src="https://dev.random42.com/GSK303/rsv.jpg" />
-    <div class="content">
-      <h1>Hello</h1>
-      <p>It's a thing</p>
-    </div>
-  </div>
-  <div class="grid-item">
-    <img class="figure" src="https://dev.random42.com/GSK303/rsv.jpg" />
-    <div class="content">
-      <h1>Hello</h1>
-      <p>It's a thing</p>
-    </div>
-  </div>
-</div>
-
 <style lang="scss">
   .video {
     position: relative;

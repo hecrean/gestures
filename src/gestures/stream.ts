@@ -7,6 +7,7 @@ import {
   Observable,
   pipe,
   race,
+  timer,
   zip,
   type UnaryFunction,
 } from "rxjs";
@@ -22,6 +23,7 @@ import {
   takeUntil,
   takeWhile,
   tap,
+  timeout,
 } from "rxjs/operators";
 import { coordinates, pointerDifference } from "./shared";
 
@@ -142,11 +144,6 @@ export function gesturable(element: HTMLElement) {
         dx: (unit * ev.deltaX) / rect.width,
       };
     }),
-    // pairwise(),
-    // map(([penultimate, latest]) => ({
-    //   dx: latest.dx - penultimate.dx,
-    //   dy: latest.dy - penultimate.dy,
-    // })),
     map((v) => ({ tag: "wheel" as const, value: v }))
   );
 
@@ -199,12 +196,13 @@ export function gesturable(element: HTMLElement) {
     };
   };
 
-  const pointercache$ = merge(pointerdown$, pointermove$, pointerup$).pipe(
+  const pointercache$ = merge(pointerdown$, pointerup$).pipe(
     scan(cache_pointers, new Map<number, TaggedPointedEvent>())
   );
 
   const activepointernumber$ = pointercache$.pipe(
-    map((v) => Array.from(v).length)
+    map((v) => Array.from(v).length),
+    takeWhile((n) => n > 0)
   );
 
   const pinch$: Observable<Pinch> = pointercache$.pipe(
@@ -225,13 +223,15 @@ export function gesturable(element: HTMLElement) {
   //   const clicks$ = pointerdown$.pipe(concatMap(dragstartEvent => pointerUp$.pipe(first())
   // const holds$
 
+  const LONG_PRESS_TIMEOUT = 600;
+
   // const click$ = pointerdown$.pipe(
   //   switchMap((event) => {
-  //     return race<UIEventResponse>(
-  //       timer(longPressTimeout).pipe(
-  //         map({
+  //     return race(
+  //       timer(LONG_PRESS_TIMEOUT).pipe(
+  //         map<0, LongPress>({
   //           type: "longPress",
-  //           event
+  //           ev:
   //         })
   //       ),
   //       pointerup$.pipe(
@@ -248,9 +248,9 @@ export function gesturable(element: HTMLElement) {
 
   const dragstart$: Observable<TaggedPointedEvent> = pointerdown$;
 
-  const drag$: Observable<Drag> = dragstart$.pipe(
-    switchMap((start) =>
-      pointermove$.pipe(
+  const drag$ = dragstart$.pipe(
+    switchMap((start) => {
+      return pointermove$.pipe(
         filter((move) => move.ev.pointerId === start.ev.pointerId),
         pairwise<TaggedPointedEvent>(),
         map<Array<TaggedPointedEvent>, Drag>(([penultimate, latest]) => {
@@ -288,9 +288,52 @@ export function gesturable(element: HTMLElement) {
             )
           )
         )
-      )
-    )
+      );
+    })
   );
+
+  //   switchMap((start) =>
+  //     pointermove$.pipe(
+  //       filter((move) => move.ev.pointerId === start.ev.pointerId),
+  //       pairwise<TaggedPointedEvent>(),
+  //       map<Array<TaggedPointedEvent>, Drag>(([penultimate, latest]) => {
+  //         const absoluteDelta = pointerDifference(element, start.ev, latest.ev);
+  //         const relativeDelta = pointerDifference(
+  //           element,
+  //           latest.ev,
+  //           penultimate.ev
+  //         );
+  //         const payload: Drag = {
+  //           tag: "drag",
+  //           value: {
+  //             phase: "dragging",
+  //             pointerId: latest.ev.pointerId,
+  //             currentEvent: latest.ev,
+  //             absoluteDelta: absoluteDelta,
+  //             relativeDelta: relativeDelta,
+  //           },
+  //         };
+  //         return payload;
+  //       }),
+  //       takeUntil(
+  //         race(
+  //           pointerup$.pipe(
+  //             filter((up) => up.ev.pointerId === start.ev.pointerId)
+  //           ),
+  //           pointercancel$.pipe(
+  //             filter((cancel) => cancel.ev.pointerId === start.ev.pointerId)
+  //           ),
+  //           pointerout$.pipe(
+  //             filter((out) => out.ev.pointerId === start.ev.pointerId)
+  //           ),
+  //           pointerleave$.pipe(
+  //             filter((leave) => leave.ev.pointerId === start.ev.pointerId)
+  //           )
+  //         )
+  //       )
+  //     )
+  //   )
+  // );
 
   const pointerclickduration$ = (pointerid: number) =>
     zip(
@@ -303,35 +346,6 @@ export function gesturable(element: HTMLElement) {
         map(() => new Date())
       )
     ).pipe(map(([start, end]) => Math.abs(start.getTime() - end.getTime())));
-
-  // const dragend$: Observable<Drag> = dragstart$.pipe(
-  //   switchMap((start) =>
-  //     pointermove$.pipe(
-  //       filter((move) => move.ev.pointerId === start.ev.pointerId),
-  //       pairwise<TaggedPointedEvent>(),
-  //       map<Array<TaggedPointedEvent>, Drag>(([penultimate, latest]) => {
-  //         const absoluteDelta = pointerDifference(element, start.ev, latest.ev);
-  //         const relativeDelta = pointerDifference(
-  //           element,
-  //           latest.ev,
-  //           penultimate.ev
-  //         );
-
-  //         const payload: Drag = {
-  //           tag: "drag",
-  //           phase: "completed",
-  //           pointerId: latest.ev.pointerId,
-  //           currentEvent: latest.ev,
-  //           absoluteDelta,
-  //           relativeDelta,
-  //         };
-  //         return payload;
-  //       }),
-  //       takeUntil(pointerup$),
-  //       last()
-  //     )
-  //   )
-  // );
 
   const takeUntilPointerUpOrRefreshed: UnaryFunction<
     Observable<number>,
@@ -356,71 +370,4 @@ export function gesturable(element: HTMLElement) {
   const gesture_stream = combineLatest([gestures$, activepointernumber$]);
 
   return gesture_stream;
-  // const dragstream = combineLatest([
-  //   dragstart$.pipe(
-  //     tap((event) => {
-  //       element.dispatchEvent(
-  //         new CustomEvent<TaggedPointedEvent>("dragstart", { detail: event })
-  //       );
-  //     })
-  //   ),
-  //   dragmove$.pipe(
-  //     tap((event) => {
-  //       element.dispatchEvent(
-  //         new CustomEvent<Drag>("dragmove", { detail: event })
-  //       );
-  //     })
-  //   ),
-  //   dragend$.pipe(
-  //     tap((event) => {
-  //       element.dispatchEvent(
-  //         new CustomEvent<Drag>("dragend", { detail: event })
-  //       );
-  //     })
-  //   ),
-  // ]);
-  // return dragstream;
 }
-
-// const dragmove$: Observable<Drag> = dragstart$.pipe(
-//   switchMap((start) =>
-//     pointermove$.pipe(
-//       filter((move) => move.pointerId === start.pointerId),
-//       scan<PointerEvent, Array<PointerEvent>>(
-//         (stream, latest) => [latest, ...stream],
-//         [start]
-//       ),
-//       filter((stream) => stream.length > 2),
-//       map<Array<PointerEvent>, Drag>((stream) => {
-//         const [latest, penultimate, ...tail] = stream;
-//         const absoluteDelta = pointerDifference(element, start, latest);
-//         const relativeDelta = pointerDifference(element, latest, penultimate);
-
-//         const payload: Drag = {
-//           tag: "drag",
-//           phase: "dragging",
-//           pointerId: latest.pointerId,
-//           currentEvent: latest,
-//           absoluteDelta,
-//           relativeDelta,
-//         };
-//         return payload;
-//       }),
-
-//       takeUntil(
-//         race(
-//           pointerup$.pipe(filter((up) => up.pointerId === start.pointerId)),
-//           pointercancel$.pipe(
-//             filter((cancel) => cancel.pointerId === start.pointerId)
-//           ),
-//           pointerout$.pipe(
-//             filter((out) => out.pointerId === start.pointerId)
-//           ),
-//           pointerleave$.pipe(
-//             filter((leave) => leave.pointerId === start.pointerId)
-//           )
-//         )
-//       )
-//     )
-//   )
-// );

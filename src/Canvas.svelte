@@ -2,8 +2,10 @@
   import { gesturable } from "@/gestures/stream";
   import { resizeObserver } from "@/utils/resize-observer";
   import { onMount } from "svelte";
-  import type { Api } from "./three-api";
-  import { createThreeApi, scale, xyPosition } from "./three-api";
+  import type { Api, ThreeState } from "./three-api";
+  import { createThreeApi, xyzPosition } from "./three-api";
+  import { $D as debug$ } from "rxjs-debug";
+  import { clamp } from "three/src/math/MathUtils";
 
   let api: Api = createThreeApi();
 
@@ -15,11 +17,82 @@
   let canvasEl: HTMLCanvasElement;
 
   $: if (isInit(api)) {
-    api.panTo($xyPosition);
+    api.panTo({ x: $xyzPosition.x, y: $xyzPosition.y });
   }
   $: if (isInit(api)) {
-    api.zoomTo($scale);
+    api.zoomTo($xyzPosition.z);
   }
+
+  const updateXYPosition = (
+    { camera, object3dHandles: { plane } }: ThreeState,
+    { dx, dy }: { dx: number; dy: number }
+  ) =>
+    xyzPosition.update(({ x, y, z }) => {
+      const fovy = (camera.fov * Math.PI) / 180;
+
+      const visibleHeightAtDistance = 2 * z * Math.tan(fovy / 2);
+
+      const visibleWidthAtDistance = camera.aspect * visibleHeightAtDistance;
+
+      const { width, height } = plane.geometry.parameters;
+
+      const position = {
+        x: clamp(
+          x + dx,
+          -width / 2 + visibleWidthAtDistance / 2,
+          width / 2 - visibleWidthAtDistance / 2
+        ),
+        y: clamp(
+          y + dy,
+          -height / 2 + visibleHeightAtDistance / 2,
+          height / 2 - visibleHeightAtDistance / 2
+        ),
+        z: z,
+      };
+
+      return position;
+    });
+
+  const updateZoom = (
+    { camera, object3dHandles: { plane } }: ThreeState,
+    dz: number
+  ) => {
+    xyzPosition.update(({ x, y, z }) => {
+      const fovy = (camera.fov * Math.PI) / 180;
+      const { width, height } = plane.geometry.parameters;
+
+      const zMax = Math.min(
+        width / (2 * camera.aspect * Math.tan(fovy / 2)),
+        height / (2 * Math.tan(fovy / 2))
+      );
+
+      const _z = clamp(z + dz, 0.1, zMax);
+
+      const proposedViewsquareWidth =
+        2 * camera.aspect * _z * Math.tan(fovy / 2);
+      const proposedViewsquareHeight = 2 * _z * Math.tan(fovy / 2);
+
+      const bounds = {
+        left: -width / 2 + proposedViewsquareWidth / 2,
+        right: width / 2 - proposedViewsquareWidth / 2,
+        bottom: -height / 2 + proposedViewsquareHeight / 2,
+        top: height / 2 - proposedViewsquareHeight / 2,
+      };
+
+      const _x =
+        x < bounds.left ? bounds.left : x > bounds.right ? bounds.right : x;
+
+      const _y =
+        y < bounds.bottom ? bounds.bottom : y > bounds.top ? bounds.top : y;
+
+      const position = {
+        x: _x,
+        y: _y,
+        z: _z,
+      };
+      return position;
+    });
+  };
 
   onMount(() => {
     api.init(canvasProxyEl, canvasEl);
@@ -32,9 +105,11 @@
 
     const gestures$ = gesturable(canvasProxyEl);
 
+    const debugGestures$ = debug$(gestures$, { id: "gestures" });
+    debugGestures$.subscribe();
+
     const gestures_subscription = gestures$.subscribe(
       ([gesture, active_pointers]) => {
-        console.log(gesture.tag);
         const wheelPredicate = true;
         const dragPredicate = active_pointers == 1;
         const pinchPredicate = active_pointers >= 2;
@@ -42,25 +117,24 @@
         switch (gesture.tag) {
           case "drag":
             if (dragPredicate) {
-              xyPosition.update(({ x, y }) => ({
-                x: x - gesture.value.relativeDelta.dx,
-                y: y - gesture.value.relativeDelta.dy,
-              }));
+              updateXYPosition(api.state(), {
+                dx: -gesture.value.relativeDelta.dx,
+                dy: -gesture.value.relativeDelta.dy,
+              });
             }
             break;
           case "pinch":
             if (pinchPredicate) {
-              scale.update((s) => s - gesture.value.dz);
-              console.log(gesture.value.dx);
-              xyPosition.update(({ x, y }) => ({
-                x: x - gesture.value.dx,
-                y: y - gesture.value.dy,
-              }));
+              updateZoom(api.state(), -gesture.value.dz);
+              updateXYPosition(api.state(), {
+                dx: -gesture.value.dx,
+                dy: -gesture.value.dy,
+              });
             }
             break;
           case "wheel":
             if (wheelPredicate) {
-              scale.update((s) => s - gesture.value.dy);
+              updateZoom(api.state(), gesture.value.dy);
             }
           default:
             break;
@@ -92,7 +166,7 @@
   tabindex="-1"
 >
   <canvas bind:this={canvasEl} />
-  <div class:overlay={true} />
+  <div class="overlay" />
 </div>
 
 <style>
